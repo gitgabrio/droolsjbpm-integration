@@ -25,6 +25,7 @@ import java.util.Map;
 import org.jbpm.services.api.AdvanceRuntimeDataService;
 import org.jbpm.services.api.ProcessInstanceNotFoundException;
 import org.jbpm.services.api.RuntimeDataService;
+import org.jbpm.services.api.RuntimeDataService.EntryType;
 import org.jbpm.services.api.TaskNotFoundException;
 import org.jbpm.services.api.model.NodeInstanceDesc;
 import org.jbpm.services.api.model.ProcessDefinition;
@@ -61,6 +62,11 @@ import org.kie.server.services.impl.marshal.MarshallerHelper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import static java.util.Arrays.asList;
+import static java.util.stream.Collectors.toList;
+import static org.jbpm.services.api.AdvanceRuntimeDataService.TASK_ATTR_NAME;
+import static org.jbpm.services.api.AdvanceRuntimeDataService.TASK_ATTR_OWNER;
+import static org.jbpm.services.api.AdvanceRuntimeDataService.TASK_ATTR_STATUS;
 import static org.kie.server.services.jbpm.ConvertUtils.buildQueryContext;
 import static org.kie.server.services.jbpm.ConvertUtils.buildQueryFilter;
 import static org.kie.server.services.jbpm.ConvertUtils.buildTaskByNameQueryFilter;
@@ -287,6 +293,15 @@ public class RuntimeDataServiceBase {
         NodeInstanceList nodeInstanceList = convertToNodeInstanceList(result);
         logger.debug("Returning result of node instances search: {}", nodeInstanceList);
         return nodeInstanceList;
+    }
+
+    public NodeInstanceList getProcessInstanceFullHistoryByType(long processInstanceId, String entryType, Integer page, Integer pageSize) {
+
+        logger.debug("About to search for node instances with page {} and page size {}", page, pageSize);
+        Collection<NodeInstanceDesc> result = null;
+
+        result = runtimeDataService.getProcessInstanceFullHistoryByType(processInstanceId, EntryType.valueOf(entryType), buildQueryContext(page, pageSize));
+        return convertToNodeInstanceList(result);
     }
 
     public VariableInstanceList getVariablesCurrentState(long processInstanceId) {
@@ -615,10 +630,24 @@ public class RuntimeDataServiceBase {
         if (payload != null) {
             filter = marshallerHelper.unmarshal(payload, payloadType, SearchQueryFilterSpec.class);
         }
-        return convertToProcessInstanceCustomVarsList(advanceRuntimeDataService.queryProcessByVariables(convertToServiceApiQueryParam(filter.getAttributesQueryParams()),
-                                                                                                        convertToServiceApiQueryParam(filter.getProcessVariablesQueryParams()),
-                                                                                                        queryContext));
+
+        List<String> params = filter.getAttributesQueryParams().stream().map(e -> e.getColumn()).collect(toList());
+        params.removeAll(asList(TASK_ATTR_NAME, TASK_ATTR_OWNER, TASK_ATTR_STATUS));
+
+        if (params.size() == filter.getAttributesQueryParams().size() && filter.getTaskVariablesQueryParams().isEmpty()) {
+            return convertToProcessInstanceCustomVarsList(advanceRuntimeDataService.queryProcessByVariables(convertToServiceApiQueryParam(filter.getAttributesQueryParams()),
+                                                                                                            convertToServiceApiQueryParam(filter.getProcessVariablesQueryParams()),
+                                                                                                            queryContext));
+        } else {
+
+            return convertToProcessInstanceCustomVarsList(advanceRuntimeDataService.queryProcessByVariablesAndTask(convertToServiceApiQueryParam(filter.getAttributesQueryParams()),
+                                                                                                                   convertToServiceApiQueryParam(filter.getProcessVariablesQueryParams()),
+                                                                                                                   convertToServiceApiQueryParam(filter.getTaskVariablesQueryParams()),
+                                                                                                                   filter.getOwners(),
+                                                                                                                   queryContext));
+        }
     }
+
 
     public ProcessInstanceUserTaskWithVariablesList queryUserTasksByVariables(String payload, String payloadType, QueryContext queryContext) {
         SearchQueryFilterSpec filter = new SearchQueryFilterSpec();

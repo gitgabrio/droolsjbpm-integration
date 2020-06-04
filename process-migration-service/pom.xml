@@ -6,7 +6,7 @@
   <parent>
     <groupId>org.drools</groupId>
     <artifactId>droolsjbpm-integration</artifactId>
-    <version>7.38.0-SNAPSHOT</version>
+    <version>7.39.0-SNAPSHOT</version>
   </parent>
 
   <artifactId>process-migration-service</artifactId>
@@ -511,7 +511,7 @@
     <profile>
       <id>wildfly</id>
       <properties>
-        <cargo.container.id>wildfly14x</cargo.container.id>
+        <cargo.container.id>wildfly18x</cargo.container.id>
         <org.kie.server.persistence.ds>java:/jdbc/jbpm</org.kie.server.persistence.ds>
       </properties>
       <build>
